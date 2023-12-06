@@ -1,0 +1,76 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "hardhat/console.sol";
+
+contract FashionToken is ERC20, Ownable, ERC20Burnable {
+    event LogMessage(string message);
+
+    enum ClothingType { Shirt, Pants, Shoes, Blazer }
+
+    mapping(ClothingType => uint256) public clothingRates;
+    ClothingType public recentlyRedeemedClothing;
+
+    constructor(address initialOwner) Ownable(initialOwner) ERC20("Fashion Token", "FTT") {
+        setPrices();
+    }
+
+    function setPrices() internal {
+        clothingRates[ClothingType.Shirt] = 200;
+        clothingRates[ClothingType.Pants] = 400;
+        clothingRates[ClothingType.Shoes] = 600;
+        clothingRates[ClothingType.Blazer] = 800;
+    }
+
+    function setItemPrices(ClothingType clothingItem, uint256 price) external onlyOwner {
+        clothingRates[clothingItem] = price;
+    }
+
+    function mintTokens(address beneficiary, uint256 value) external onlyOwner {
+        _mint(beneficiary, value);
+    }
+
+    function transferTokens(address recipient, uint256 value) external {
+        require(balanceOf(msg.sender) >= value, "INSUFFICIENT TOKENS!!");
+        _transfer(msg.sender, recipient, value);
+    }
+
+    function burnTokens(uint256 value) external {
+        require(balanceOf(msg.sender) >= value, "INSUFFICIENT TOKENS!!");
+        _burn(msg.sender, value);
+        emit LogMessage("Tokens burned successfully");
+    }
+
+    function redeemForFashion(uint256 tokenValue) external {
+        recentlyRedeemedClothing = determineRedeemedClothing(tokenValue);
+        require(clothingRates[recentlyRedeemedClothing] > 0, "Invalid clothing type");
+        require(balanceOf(msg.sender) >= clothingRates[recentlyRedeemedClothing], "INSUFFICIENT TOKENS!!");
+        _burn(msg.sender, clothingRates[recentlyRedeemedClothing]);
+        emit LogMessage("Fashion item redeemed successfully");
+    }
+
+    function getBalance() external view returns (uint256) {
+        return balanceOf(msg.sender);
+    }
+
+    function determineRedeemedClothing(uint256 tokenValue) internal view returns (ClothingType) {
+        if (clothingRates[ClothingType.Blazer] <= tokenValue) {
+            return ClothingType.Blazer;
+        } else if (clothingRates[ClothingType.Shoes] <= tokenValue) {
+            return ClothingType.Shoes;
+        } else if (clothingRates[ClothingType.Pants] <= tokenValue) {
+            return ClothingType.Pants;
+        } else if (clothingRates[ClothingType.Shirt] <= tokenValue) {
+            return ClothingType.Shirt;
+        } else {
+            revert("No fashion item can be redeemed with the specified token value");
+        }
+    }
+
+    function getRecentlyRedeemedClothing() external view returns (ClothingType) {
+        return recentlyRedeemedClothing;
+    }
+}
